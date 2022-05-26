@@ -1,0 +1,16 @@
+[project]
+name = "asdf"
+version = "0.0.1"
+module_type = "lib"
+
+[dependencies]
+
+[flags]
+
+[sources]
+source = [
+    "main.cc"
+]
+header = [
+
+]

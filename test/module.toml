@@ -1,0 +1,17 @@
+[project]
+name = "cpm"
+version = "0.0.1"
+module_type = "bin"
+
+[dependencies]
+asdf = "1.0.0"
+
+[flags]
+
+[sources]
+source = [
+    "main.cc"
+]
+header = [
+
+]
