@@ -1,8 +1,6 @@
-use current_platform::CURRENT_PLATFORM;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
-extern crate cc;
 mod build;
 
 fn main() {
@@ -26,21 +24,8 @@ fn main() {
         }
         "build" => {
             if let Some(path) = path {
-                let outdir = std::env::current_dir()
-                    .unwrap()
-                    .join(&path)
-                    .join("modules/target");
-                std::env::set_var("OUT_DIR", outdir);
-                std::env::set_var("TARGET", CURRENT_PLATFORM);
-                std::env::set_var("OPT_LEVEL", "3");
-                std::env::set_var("HOST", CURRENT_PLATFORM);
                 build_module(&path, None);
             } else {
-                let outdir = std::env::current_dir().unwrap().join("modules/target");
-                std::env::set_var("OUT_DIR", outdir);
-                std::env::set_var("TARGET", CURRENT_PLATFORM);
-                std::env::set_var("OPT_LEVEL", "3");
-                std::env::set_var("HOST", CURRENT_PLATFORM);
                 build_module(&String::from("."), None);
             }
         }
