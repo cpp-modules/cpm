@@ -1,7 +1,9 @@
+use current_platform::CURRENT_PLATFORM;
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 
 extern crate cc;
+mod build;
 
 fn main() {
     let args = std::env::args().collect::<Vec<_>>();
@@ -29,16 +31,16 @@ fn main() {
                     .join(&path)
                     .join("modules/target");
                 std::env::set_var("OUT_DIR", outdir);
-                std::env::set_var("TARGET", "x86_64-pc-windows-msvc");
+                std::env::set_var("TARGET", CURRENT_PLATFORM);
                 std::env::set_var("OPT_LEVEL", "3");
-                std::env::set_var("HOST", "x86_64-pc-windows-msvc");
+                std::env::set_var("HOST", CURRENT_PLATFORM);
                 build_module(&path, None);
             } else {
                 let outdir = std::env::current_dir().unwrap().join("modules/target");
                 std::env::set_var("OUT_DIR", outdir);
-                std::env::set_var("TARGET", "x86_64-pc-windows-msvc");
+                std::env::set_var("TARGET", CURRENT_PLATFORM);
                 std::env::set_var("OPT_LEVEL", "3");
-                std::env::set_var("HOST", "x86_64-pc-windows-msvc");
+                std::env::set_var("HOST", CURRENT_PLATFORM);
                 build_module(&String::from("."), None);
             }
         }
@@ -50,33 +52,57 @@ fn main() {
 }
 
 fn build_module(root_path: &String, submodule_path: Option<String>) {
-    let mut builder = cc::Build::new();
-    builder.cpp(true);
+    let mut builder = build::Build::new();
 
-    let module_path = if let Some(submodule_path) = submodule_path {
-        builder.static_flag(true);
-        std::env::current_dir()
-            .unwrap()
-            .join(root_path)
-            .join("modules")
-            .join(&submodule_path)
+    let (module_path, output_path) = if let Some(submodule_path) = &submodule_path {
+        builder.flag("-static").flag("-shared");
+        (
+            std::env::current_dir()
+                .unwrap()
+                .join(root_path)
+                .join("modules")
+                .join(&submodule_path),
+            std::env::current_dir()
+                .unwrap()
+                .join(root_path)
+                .join("modules/lib"),
+        )
     } else {
-        std::env::current_dir().unwrap().join(root_path)
+        (
+            std::env::current_dir().unwrap().join(root_path),
+            std::env::current_dir().unwrap().join(root_path)
+        )
     };
 
     let module_toml = std::fs::read_to_string(module_path.join("module.toml"))
         .expect("Failed to read module.toml");
     let module: Module = toml::from_str(&module_toml).expect("Failed to parse module.toml");
 
-    for (submodule, _) in module.dependencies {
-        build_module(root_path, Some(submodule));
+    for (submodule, _) in &module.dependencies {
+        build_module(root_path, Some(submodule.to_string()));
     }
 
     for filename in module.sources.source {
-        builder.file(module_path.join(filename));
+        builder.source(module_path.join(filename));
     }
 
-    builder.compile(&module.project.name);
+    let output_path = match submodule_path {
+        Some(_) => output_path.join("lib".to_owned() + &module.project.name + ".a"),
+        None => output_path.join(module.project.name),
+    };
+
+    builder.libdir(
+        std::env::current_dir()
+            .unwrap()
+            .join(root_path)
+            .join("modules/lib"),
+    );
+    for (submodule, _) in module.dependencies {
+        builder.linklib(&submodule);
+    }
+
+    builder.outdir(output_path);
+    builder.exec();
 }
 
 #[derive(Debug, Serialize, Deserialize)]
