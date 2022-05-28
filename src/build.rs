@@ -42,6 +42,14 @@ impl Build {
         self
     }
 
+    pub fn includedir(&mut self, dir: PathBuf) -> &mut Build {
+        self.options.push(OptionType::ImplicitDir(
+            "-I".to_string(),
+            dir.to_str().unwrap().to_string(),
+        ));
+        self
+    }
+
     pub fn source(&mut self, path: PathBuf) -> &mut Build {
         self.inputs.push(path.to_str().unwrap().to_string());
         self
@@ -77,6 +85,6 @@ impl Build {
             }
         }
 
-        cmd.spawn();
+        cmd.spawn().unwrap();
     }
 }

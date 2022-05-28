@@ -9,8 +9,8 @@ module_type = "lib"
 
 [sources]
 source = [
-    "main.cc"
+    "src/asdf.cc"
 ]
 header = [
-
+    "asdf.h"
 ]

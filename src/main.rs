@@ -24,6 +24,14 @@ fn main() {
         }
         "build" => {
             if let Some(path) = path {
+                let module_lib_path = std::env::current_dir()
+                    .unwrap()
+                    .join(&path)
+                    .join("modules/lib");
+
+                if !module_lib_path.exists() {
+                    std::fs::create_dir(module_lib_path).unwrap();
+                };
                 build_module(&path, None);
             } else {
                 build_module(&String::from("."), None);
@@ -40,7 +48,7 @@ fn build_module(root_path: &String, submodule_path: Option<String>) {
     let mut builder = build::Build::new();
 
     let (module_path, output_path) = if let Some(submodule_path) = &submodule_path {
-        builder.flag("-static").flag("-shared");
+        builder.flag("-c");
         (
             std::env::current_dir()
                 .unwrap()
@@ -55,7 +63,7 @@ fn build_module(root_path: &String, submodule_path: Option<String>) {
     } else {
         (
             std::env::current_dir().unwrap().join(root_path),
-            std::env::current_dir().unwrap().join(root_path)
+            std::env::current_dir().unwrap().join(root_path),
         )
     };
 
@@ -82,6 +90,13 @@ fn build_module(root_path: &String, submodule_path: Option<String>) {
             .join(root_path)
             .join("modules/lib"),
     );
+    builder.includedir(
+        std::env::current_dir()
+            .unwrap()
+            .join(root_path)
+            .join("modules"),
+    );
+
     for (submodule, _) in module.dependencies {
         builder.linklib(&submodule);
     }

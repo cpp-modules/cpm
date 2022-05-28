@@ -1,5 +1,6 @@
 #include <iostream>
+#include <asdf/asdf.h>
 
 int main() {
-    std::cout << "Hello";
+    print_hello();
 }
