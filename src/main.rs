@@ -1,130 +1,58 @@
-use serde::{Deserialize, Serialize};
-use std::collections::BTreeMap;
+use clap::{Parser, Subcommand};
+use std::path::PathBuf;
 
 mod build;
+mod module_toml;
+mod publish;
+
+/// The cpm command line interface.
+#[derive(Parser, Debug)]
+#[clap(author, version, about, long_about = None)]
+struct Cli {
+    #[clap(subcommand)]
+    cmd: Commands,
+}
+
+#[derive(Subcommand, Debug)]
+enum Commands {
+    /// Build a project.
+    Build {
+        /// The project to build.
+        #[clap(parse(from_os_str), default_value = ".")]
+        path: PathBuf,
+    },
+
+    /// Publish a project.
+    Publish {
+        /// The project to publish.
+        #[clap(parse(from_os_str), default_value = ".")]
+        path: PathBuf,
+    },
+
+    /// Install dependencies.
+    Install,
+}
 
 fn main() {
-    let args = std::env::args().collect::<Vec<_>>();
-    if args.len() == 1 {
-        println!("Helper: {} help", args[0]);
-        std::process::exit(1);
-    }
+    let cli = Cli::parse();
 
-    let mut args = args.into_iter();
-    let cpm = args.next().unwrap();
-    let command = args.next().unwrap();
-    let path = args.next();
-
-    match command.as_str() {
-        "help" => {
-            println!("Usage: {} <command>", cpm);
-            println!("Commands:");
-            println!("  help");
-            println!("  build");
-        }
-        "build" => {
-            if let Some(path) = path {
-                let module_lib_path = std::env::current_dir()
-                    .unwrap()
-                    .join(&path)
-                    .join("modules/lib");
-
-                if !module_lib_path.exists() {
-                    std::fs::create_dir(module_lib_path).unwrap();
-                };
-                build_module(&path, None);
-            } else {
-                build_module(&String::from("."), None);
+    match cli.cmd {
+        Commands::Build { path } => {
+            match std::fs::create_dir((&path).join("modules/lib")) {
+                Ok(_) => {}
+                Err(e) => {
+                    if e.kind() != std::io::ErrorKind::AlreadyExists {
+                        panic!("{}", e);
+                    }
+                }
             }
+            build::build_root(&path);
         }
-        _ => {
-            println!("Unknown command: {}", command);
-            std::process::exit(1);
+        Commands::Publish { path } => {
+            publish::publish(&path);
+        }
+        Commands::Install => {
+            println!("install");
         }
     }
 }
-
-fn build_module(root_path: &String, submodule_path: Option<String>) {
-    let mut builder = build::Build::new();
-
-    let (module_path, output_path) = if let Some(submodule_path) = &submodule_path {
-        builder.flag("-c");
-        (
-            std::env::current_dir()
-                .unwrap()
-                .join(root_path)
-                .join("modules")
-                .join(&submodule_path),
-            std::env::current_dir()
-                .unwrap()
-                .join(root_path)
-                .join("modules/lib"),
-        )
-    } else {
-        (
-            std::env::current_dir().unwrap().join(root_path),
-            std::env::current_dir().unwrap().join(root_path),
-        )
-    };
-
-    let module_toml = std::fs::read_to_string(module_path.join("module.toml"))
-        .expect("Failed to read module.toml");
-    let module: Module = toml::from_str(&module_toml).expect("Failed to parse module.toml");
-
-    for (submodule, _) in &module.dependencies {
-        build_module(root_path, Some(submodule.to_string()));
-    }
-
-    for filename in module.sources.source {
-        builder.source(module_path.join(filename));
-    }
-
-    let output_path = match submodule_path {
-        Some(_) => output_path.join("lib".to_owned() + &module.project.name + ".a"),
-        None => output_path.join(module.project.name),
-    };
-
-    builder.libdir(
-        std::env::current_dir()
-            .unwrap()
-            .join(root_path)
-            .join("modules/lib"),
-    );
-    builder.includedir(
-        std::env::current_dir()
-            .unwrap()
-            .join(root_path)
-            .join("modules"),
-    );
-
-    for (submodule, _) in module.dependencies {
-        builder.linklib(&submodule);
-    }
-
-    builder.outdir(output_path);
-    builder.exec();
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Module {
-    pub project: Project,
-    pub dependencies: Deps,
-    pub flags: Flags,
-    pub sources: Sources,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Project {
-    pub name: String,
-    pub version: String,
-    pub module_type: String,
-}
-
-#[derive(Debug, Serialize, Deserialize)]
-struct Sources {
-    pub source: Vec<String>,
-    pub header: Vec<String>,
-}
-
-type Deps = BTreeMap<String, String>;
-type Flags = BTreeMap<String, String>;
